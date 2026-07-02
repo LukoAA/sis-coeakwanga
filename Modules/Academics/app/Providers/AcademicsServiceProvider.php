@@ -50,6 +50,8 @@ class AcademicsServiceProvider extends ModuleServiceProvider
     $this->app->bind(
         \Modules\Academics\Contracts\AcademicStructure::class,
         \Modules\Academics\Services\AcademicStructureService::class,
+        \Modules\Admissions\Contracts\AcceptanceFeeGate::class,
+        \Modules\Admissions\Services\InterimAcceptanceFeeGate::class,
     );
 }
 }
