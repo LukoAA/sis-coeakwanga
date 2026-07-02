@@ -43,4 +43,14 @@ class AdmissionsServiceProvider extends ModuleServiceProvider
     // {
     //     $schedule->command('inspire')->hourly();
     // }
+
+    public function register(): void
+    {
+        parent::register();
+
+        $this->app->bind(
+            \Modules\Admissions\Contracts\AcceptanceFeeGate::class,
+            \Modules\Finance\Services\FinanceAcceptanceFeeGate::class,
+        );
+    }
 }
