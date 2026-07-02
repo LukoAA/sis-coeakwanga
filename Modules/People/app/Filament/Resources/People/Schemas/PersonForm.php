@@ -4,7 +4,9 @@ namespace Modules\People\Filament\Resources\People\Schemas;
 
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
@@ -14,9 +16,28 @@ class PersonForm
     {
         return $schema
             ->components([
+                Grid::make(3)
+                    ->components([
+                        Section::make('Passport')
+                            ->columnStart(2)
+                            ->columnSpan(1)
+                            ->components([
+                                SpatieMediaLibraryFileUpload::make('photo')
+                                    ->collection('photo')
+                                    ->image()
+                                    ->avatar()
+                                    ->imageEditor()
+                                    ->conversion('id_card')
+                                    ->label('')
+                                    ->alignCenter(),
+                            ]),
+                    ]),
+
                 Section::make('Identity')
                     ->description('Required core — enough to identify and match a person.')
+                    ->columnSpanFull()
                     ->columns(2)
+                    ->collapsible()
                     ->components([
                         TextInput::make('surname')
                             ->required(),
@@ -31,11 +52,14 @@ class PersonForm
                             ->required(),
                         DatePicker::make('date_of_birth')
                             ->required()
-                            ->maxDate(now()),
+                            ->maxDate(now())
+                            ->columnSpanFull(),
                     ]),
 
                 Section::make('Contact')
-                    ->columns(2)
+                    ->columnSpanFull()
+                    ->columns(3)
+                    ->collapsible()
                     ->components([
                         TextInput::make('phone')
                             ->tel()
@@ -49,7 +73,9 @@ class PersonForm
                     ]),
 
                 Section::make('Next of kin')
-                    ->columns(2)
+                    ->columnSpanFull()
+                    ->columns(3)
+                    ->collapsible()
                     ->collapsed()
                     ->components([
                         TextInput::make('next_of_kin_name'),

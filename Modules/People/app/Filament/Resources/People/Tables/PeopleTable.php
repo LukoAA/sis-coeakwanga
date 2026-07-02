@@ -11,6 +11,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 
 class PeopleTable
 {
@@ -18,6 +19,12 @@ class PeopleTable
     {
         return $table
             ->columns([
+                SpatieMediaLibraryImageColumn::make('photo')
+                    ->collection('photo')
+                    ->conversion('avatar')
+                    ->circular()
+                    ->label(''),
+                    
                 TextColumn::make('surname')
                     ->label('Name')
                     ->formatStateUsing(fn ($record) => $record->fullName())
