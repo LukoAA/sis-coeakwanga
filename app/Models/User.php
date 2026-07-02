@@ -11,13 +11,15 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
+use Spatie\Permission\Traits\HasRoles;
+use Spatie\Permission\Models\Role;
 
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, HasRoles;
 
     /**
      * Get the attributes that should be cast.
@@ -34,8 +36,11 @@ class User extends Authenticatable implements FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        // Temporary: allow any authenticated user into any panel.
-        // We'll gate by spatie role per panel once the panels exist.
-        return true;
+        return match ($panel->getId()) {
+            'admin' => $this->hasAnyRole(['registrar', 'it_admin']),
+            'bursary' => $this->hasAnyRole(['bursar', 'it_admin']),
+            'lecturer' => $this->hasAnyRole(['lecturer', 'it_admin']),
+            default => false,
+        };
     }
 }

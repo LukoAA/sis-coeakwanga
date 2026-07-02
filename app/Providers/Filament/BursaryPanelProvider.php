@@ -26,6 +26,7 @@ class BursaryPanelProvider extends PanelProvider
         return $panel
             ->id('bursary')
             ->path('bursary')
+            ->login()
             ->colors([
                 'primary' => Color::Amber,
             ])
