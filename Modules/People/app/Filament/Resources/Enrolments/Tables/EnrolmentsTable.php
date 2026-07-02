@@ -10,6 +10,8 @@ use Filament\Actions\RestoreBulkAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Filament\Tables\Filters\SelectFilter;
+use Modules\People\Models\Enrolment;
 
 class EnrolmentsTable
 {
@@ -17,47 +19,62 @@ class EnrolmentsTable
     {
         return $table
             ->columns([
-                TextColumn::make('person.id')
-                    ->searchable(),
                 TextColumn::make('matric_number')
-                    ->searchable(),
+                    ->label('Matric No.')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('person.surname')
+                    ->label('Student')
+                    ->formatStateUsing(fn ($record) => $record->person?->fullName())
+                    ->searchable(['surname', 'first_name']),
+
+                TextColumn::make('programme.name')
+                    ->label('Programme')
+                    ->searchable()
+                    ->toggleable(),
+
+                TextColumn::make('level.label')
+                    ->label('Level')
+                    ->sortable(),
+
                 TextColumn::make('programme_type')
-                    ->searchable(),
-                TextColumn::make('entry_route')
-                    ->searchable(),
+                    ->badge()
+                    ->label('Type'),
+
                 TextColumn::make('status')
-                    ->searchable(),
-                TextColumn::make('graduation_outcome')
-                    ->searchable(),
-                TextColumn::make('graduated_at')
-                    ->date()
-                    ->sortable(),
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        Enrolment::STATUS_ACTIVE => 'success',
+                        Enrolment::STATUS_GRADUATED => 'info',
+                        Enrolment::STATUS_WITHDRAWN => 'danger',
+                        Enrolment::STATUS_DEFERRED => 'warning',
+                        default => 'gray',
+                    }),
+
                 TextColumn::make('admissionSession.name')
-                    ->searchable(),
-                TextColumn::make('programme_id')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('current_level_id')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('subject_combination_id')
-                    ->numeric()
-                    ->sortable(),
+                    ->label('Session')
+                    ->toggleable(),
+
                 TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('deleted_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                TrashedFilter::make(),
+                SelectFilter::make('programme_type')
+                    ->options([
+                        Enrolment::TYPE_NCE => 'NCE',
+                        Enrolment::TYPE_DEGREE => 'Degree',
+                    ]),
+                SelectFilter::make('status')
+                    ->options([
+                        Enrolment::STATUS_ACTIVE => 'Active',
+                        Enrolment::STATUS_GRADUATED => 'Graduated',
+                        Enrolment::STATUS_WITHDRAWN => 'Withdrawn',
+                        Enrolment::STATUS_DEFERRED => 'Deferred',
+                    ]),
+                \Filament\Tables\Filters\TrashedFilter::make(),
             ])
             ->recordActions([
                 EditAction::make(),

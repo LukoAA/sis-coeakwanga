@@ -8,6 +8,7 @@ use Filament\Actions\EditAction;
 use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 
@@ -18,45 +19,45 @@ class PeopleTable
         return $table
             ->columns([
                 TextColumn::make('surname')
-                    ->searchable(),
-                TextColumn::make('first_name')
-                    ->searchable(),
+                    ->label('Name')
+                    ->formatStateUsing(fn ($record) => $record->fullName())
+                    ->searchable(['surname', 'first_name', 'other_names'])
+                    ->sortable(),
+
                 TextColumn::make('gender')
-                    ->searchable(),
+                    ->badge()
+                    ->toggleable(),
+
                 TextColumn::make('date_of_birth')
+                    ->label('DOB')
                     ->date()
                     ->sortable(),
+
                 TextColumn::make('phone')
                     ->searchable(),
-                TextColumn::make('other_names')
-                    ->searchable(),
-                TextColumn::make('email')
-                    ->label('Email address')
-                    ->searchable(),
+
                 TextColumn::make('state_of_origin')
-                    ->searchable(),
-                TextColumn::make('lga')
-                    ->searchable(),
-                TextColumn::make('next_of_kin_name')
-                    ->searchable(),
-                TextColumn::make('next_of_kin_phone')
-                    ->searchable(),
-                TextColumn::make('next_of_kin_relationship')
-                    ->searchable(),
+                    ->label('State')
+                    ->toggleable(),
+
+                TextColumn::make('enrolments_count')
+                    ->label('Enrolments')
+                    ->counts('enrolments')
+                    ->badge()
+                    ->color(fn (int $state): string => $state > 1 ? 'success' : 'gray')
+                    ->tooltip('2+ enrolments = returning graduate (NCE → Degree)'),
+
                 TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('deleted_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                SelectFilter::make('gender')
+                    ->options([
+                        'male' => 'Male',
+                        'female' => 'Female',
+                    ]),
                 TrashedFilter::make(),
             ])
             ->recordActions([

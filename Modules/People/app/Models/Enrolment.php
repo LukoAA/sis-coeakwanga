@@ -89,4 +89,19 @@ class Enrolment extends Model
     {
         return EnrolmentFactory::new();
     }
+
+    public function programme(): BelongsTo
+    {
+        return $this->belongsTo(\Modules\Academics\Models\Programme::class);
+    }
+
+    public function level(): BelongsTo
+    {
+        return $this->belongsTo(\Modules\Academics\Models\Level::class, 'current_level_id');
+    }
+
+    public function subjectCombination(): BelongsTo
+    {
+        return $this->belongsTo(\Modules\Academics\Models\SubjectCombination::class);
+    }
 }
