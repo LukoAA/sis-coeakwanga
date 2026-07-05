@@ -2,7 +2,7 @@
 
 namespace Modules\Admissions\Filament\Resources\Modules\Admissions\Models\Applications;
 
-use App\Models\Modules\Admissions\Models\Application;
+use Modules\Admissions\Models\Application;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
