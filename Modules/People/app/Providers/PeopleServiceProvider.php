@@ -43,4 +43,14 @@ class PeopleServiceProvider extends ModuleServiceProvider
     // {
     //     $schedule->command('inspire')->hourly();
     // }
+
+    public function register(): void
+    {
+        parent::register();
+
+        $this->app->bind(
+            \Modules\People\Contracts\PeopleDirectory::class,
+            \Modules\People\Services\PeopleDirectoryService::class,
+        );
+    }
 }

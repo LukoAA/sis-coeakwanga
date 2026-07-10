@@ -3,4 +3,6 @@
 return [
     App\Providers\AppServiceProvider::class,
     App\Providers\Filament\AdminPanelProvider::class,
+    App\Providers\Filament\BursaryPanelProvider::class,
+    App\Providers\Filament\LecturerPanelProvider::class,
 ];

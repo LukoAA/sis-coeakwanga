@@ -1,0 +1,16 @@
+services:
+  pgsql:
+    image: postgres:16
+    container_name: sis-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_DB: sis_coeakwanga
+    volumes:
+      - sis_pgdata:/var/lib/postgresql/data
+
+volumes:
+  sis_pgdata:
+    external: true   # reuses the volume you just created above

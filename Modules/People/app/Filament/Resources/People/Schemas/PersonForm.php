@@ -9,6 +9,8 @@ use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Utilities\Get;
+use Modules\People\Data\NigeriaStates;
 
 class PersonForm
 {
@@ -67,10 +69,18 @@ class PersonForm
                         TextInput::make('email')
                             ->label('Email address')
                             ->email(),
-                        TextInput::make('state_of_origin'),
-                        TextInput::make('lga')
-                            ->label('LGA'),
-                    ]),
+                        Select::make('state_of_origin')
+                            ->label('State of origin')
+                            ->options(NigeriaStates::stateNames())
+                            ->searchable()
+                            ->live()
+                            ->afterStateUpdated(fn (callable $set) => $set('lga', null)),
+
+                        Select::make('lga')
+                            ->label('LGA')
+                            ->options(fn (Get $get): array => NigeriaStates::lgasFor($get('state_of_origin')))
+                            ->searchable(),
+                                        ]),
 
                 Section::make('Next of kin')
                     ->columnSpanFull()
