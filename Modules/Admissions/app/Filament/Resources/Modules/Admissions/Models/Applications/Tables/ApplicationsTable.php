@@ -9,7 +9,10 @@ use Filament\Actions\EditAction;
 use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -66,6 +69,7 @@ class ApplicationsTable
                 TrashedFilter::make(),
             ])
             ->recordActions([
+                // 1. SCREEN — pending -> screened
                 Action::make('screen')
                     ->label('Screen')
                     ->icon('heroicon-o-clipboard-document-check')
@@ -74,15 +78,90 @@ class ApplicationsTable
                     ->schema([
                         TextInput::make('screening_score')
                             ->label('Screening score')
-                            ->numeric()
-                            ->minValue(0)
-                            ->maxValue(100)
-                            ->required(),
+                            ->numeric()->minValue(0)->maxValue(100)->required(),
                     ])
                     ->action(function (array $data, Application $record) {
                         app(AdmissionService::class)->screen($record, (float) $data['screening_score']);
                         Notification::make()->title('Application screened')->success()->send();
                     }),
+
+                // 2. MAKE OFFER — screened -> offered
+                Action::make('makeOffer')
+                    ->label('Make offer')
+                    ->icon('heroicon-o-envelope')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalDescription('Send an offer of admission to this applicant?')
+                    ->visible(fn (Application $record) => $record->status === Application::STATUS_SCREENED)
+                    ->action(function (Application $record) {
+                        app(AdmissionService::class)->makeOffer($record);
+                        Notification::make()->title('Offer made')->success()->send();
+                    }),
+
+                // 3. ACCEPT OFFER — offered -> accepted (and mark acceptance fee paid to unlock finalise)
+                Action::make('acceptOffer')
+                    ->label('Accept offer')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('primary')
+                    ->visible(fn (Application $record) => $record->status === Application::STATUS_OFFERED)
+                    ->schema([
+                        Toggle::make('mark_fee_paid')
+                            ->label('Acceptance fee paid')
+                            ->helperText('Matric generation is gated on this. Toggle on once payment is confirmed.')
+                            ->default(false),
+                    ])
+                    ->action(function (array $data, Application $record) {
+                        $service = app(AdmissionService::class);
+                        if ($record->offer) {
+                            $service->acceptOffer($record->offer);
+                        } else {
+                            $record->update(['status' => Application::STATUS_ACCEPTED]);
+                        }
+                        if (! empty($data['mark_fee_paid'])) {
+                            $record->update(['acceptance_fee_paid' => true]);
+                        }
+                        Notification::make()->title('Offer accepted')->success()->send();
+                    }),
+
+                // 4. FINALISE — accepted -> enrolled (matcher + fee gate + matric + enrolment)
+                Action::make('finalise')
+                    ->label('Finalise admission')
+                    ->icon('heroicon-o-academic-cap')
+                    ->color('success')
+                    ->visible(fn (Application $record) => $record->status === Application::STATUS_ACCEPTED)
+                    ->schema(fn (Application $record) => [
+                        Placeholder::make('fee_status')
+                            ->label('Acceptance fee')
+                            ->content($record->acceptance_fee_paid ? '✓ Paid' : '✗ NOT paid — finalisation will be blocked'),
+                        Radio::make('person_choice')
+                            ->label('Applicant identity')
+                            ->options(static::matchOptions($record))
+                            ->default(static::defaultChoice($record))
+                            ->required()
+                            ->helperText('If this applicant matches an existing person (e.g. a returning NCE graduate), link them so a second enrolment is added to the same record.'),
+                    ])
+                    ->action(function (array $data, Application $record) {
+                        $service = app(AdmissionService::class);
+
+                        $existingPerson = null;
+                        if ($data['person_choice'] !== 'new') {
+                            $existingPerson = \Modules\People\Models\Person::find((int) $data['person_choice']);
+                        }
+
+                        try {
+                            $enrolment = $service->finaliseAdmission($record, $existingPerson);
+                            Notification::make()
+                                ->title('Admission finalised')
+                                ->body("Matric number: {$enrolment->matric_number}")
+                                ->success()->send();
+                        } catch (\Throwable $e) {
+                            Notification::make()
+                                ->title('Could not finalise')
+                                ->body($e->getMessage())
+                                ->danger()->send();
+                        }
+                    }),
+
                 ViewAction::make(),
                 EditAction::make(),
             ])
@@ -93,5 +172,27 @@ class ApplicationsTable
                     RestoreBulkAction::make(),
                 ]),
             ]);
+    }
+
+    /** Build the identity radio options: ranked matches + a "create new person" choice. */
+    protected static function matchOptions(Application $record): array
+    {
+        $options = [];
+        foreach (app(AdmissionService::class)->findReturningPersonMatches($record) as $match) {
+            $person = $match['person'];
+            $reasons = implode(', ', $match['reasons']);
+            $options[(string) $person->id] = "{$person->fullName()} — match score {$match['score']} ({$reasons})";
+        }
+        $options['new'] = 'Create a NEW person (no existing match)';
+
+        return $options;
+    }
+
+    /** Default to the top-ranked match if any, else "new". */
+    protected static function defaultChoice(Application $record): string
+    {
+        $matches = app(AdmissionService::class)->findReturningPersonMatches($record);
+
+        return $matches->isNotEmpty() ? (string) $matches->first()['person']->id : 'new';
     }
 }
