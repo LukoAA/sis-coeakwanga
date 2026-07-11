@@ -12,7 +12,6 @@ use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -21,6 +20,10 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Modules\Admissions\Models\Application;
 use Modules\Admissions\Services\AdmissionService;
+use Modules\Finance\Models\Invoice;
+use Modules\Finance\Services\InvoiceGenerator;
+use Modules\Finance\Services\PaymentService;
+use Modules\People\Models\Person;
 use Modules\People\Models\Enrolment;
 
 class ApplicationsTable
@@ -47,7 +50,10 @@ class ApplicationsTable
                         Application::STATUS_REJECTED => 'danger',
                         default => 'gray',
                     }),
-                IconColumn::make('acceptance_fee_paid')->label('Fee paid')->boolean(),
+                IconColumn::make('acceptance_fee_paid')
+                    ->label('Fee paid')
+                    ->state(fn (Application $record) => static::acceptanceFeePaid($record))
+                    ->boolean(),
                 TextColumn::make('screening_score')->label('Score')->toggleable(),
                 TextColumn::make('academicSession.name')->label('Session')->toggleable(),
             ])
@@ -98,41 +104,56 @@ class ApplicationsTable
                         Notification::make()->title('Offer made')->success()->send();
                     }),
 
-                // 3. ACCEPT OFFER — offered -> accepted (and mark acceptance fee paid to unlock finalise)
+                // 3. ACCEPT OFFER — offered -> accepted, AND auto-generate the acceptance invoice
                 Action::make('acceptOffer')
                     ->label('Accept offer')
                     ->icon('heroicon-o-check-circle')
                     ->color('primary')
+                    ->requiresConfirmation()
+                    ->modalDescription('Record the applicant\'s acceptance? This generates their acceptance-fee invoice.')
                     ->visible(fn (Application $record) => $record->status === Application::STATUS_OFFERED)
-                    ->schema([
-                        Toggle::make('mark_fee_paid')
-                            ->label('Acceptance fee paid')
-                            ->helperText('Matric generation is gated on this. Toggle on once payment is confirmed.')
-                            ->default(false),
-                    ])
-                    ->action(function (array $data, Application $record) {
+                    ->action(function (Application $record) {
                         $service = app(AdmissionService::class);
                         if ($record->offer) {
                             $service->acceptOffer($record->offer);
                         } else {
                             $record->update(['status' => Application::STATUS_ACCEPTED]);
                         }
-                        if (! empty($data['mark_fee_paid'])) {
-                            $record->update(['acceptance_fee_paid' => true]);
-                        }
-                        Notification::make()->title('Offer accepted')->success()->send();
+                        // Auto-generate the acceptance invoice so the bursary can collect it.
+                        app(InvoiceGenerator::class)->generateAcceptanceInvoice($record);
+                        Notification::make()
+                            ->title('Offer accepted')
+                            ->body('Acceptance-fee invoice generated.')
+                            ->success()->send();
                     }),
 
-                // 4. FINALISE — accepted -> enrolled (matcher + fee gate + matric + enrolment)
+                // 3b. RECORD ACCEPTANCE PAYMENT — accepted & unpaid -> confirms the payment
+                Action::make('recordAcceptancePayment')
+                    ->label('Record acceptance payment')
+                    ->icon('heroicon-o-banknotes')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalDescription('Confirm the acceptance-fee payment for this applicant?')
+                    ->visible(fn (Application $record) => $record->status === Application::STATUS_ACCEPTED
+                        && ! static::acceptanceFeePaid($record))
+                    ->action(function (Application $record) {
+                        $invoice = Invoice::where('application_id', $record->id)->first()
+                            ?? app(InvoiceGenerator::class)->generateAcceptanceInvoice($record);
+
+                        $payments = app(PaymentService::class);
+                        $payments->confirmPayment($payments->recordPayment($invoice, (float) $invoice->balance()));
+
+                        Notification::make()->title('Acceptance payment recorded')->success()->send();
+                    }),
+
+                // 4. FINALISE — accepted & fee paid -> enrolled (matcher + matric + enrolment)
                 Action::make('finalise')
                     ->label('Finalise admission')
                     ->icon('heroicon-o-academic-cap')
                     ->color('success')
-                    ->visible(fn (Application $record) => $record->status === Application::STATUS_ACCEPTED)
+                    ->visible(fn (Application $record) => $record->status === Application::STATUS_ACCEPTED
+                        && static::acceptanceFeePaid($record))
                     ->schema(fn (Application $record) => [
-                        Placeholder::make('fee_status')
-                            ->label('Acceptance fee')
-                            ->content($record->acceptance_fee_paid ? '✓ Paid' : '✗ NOT paid — finalisation will be blocked'),
                         Radio::make('person_choice')
                             ->label('Applicant identity')
                             ->options(static::matchOptions($record))
@@ -142,11 +163,9 @@ class ApplicationsTable
                     ])
                     ->action(function (array $data, Application $record) {
                         $service = app(AdmissionService::class);
-
-                        $existingPerson = null;
-                        if ($data['person_choice'] !== 'new') {
-                            $existingPerson = \Modules\People\Models\Person::find((int) $data['person_choice']);
-                        }
+                        $existingPerson = $data['person_choice'] !== 'new'
+                            ? Person::find((int) $data['person_choice'])
+                            : null;
 
                         try {
                             $enrolment = $service->finaliseAdmission($record, $existingPerson);
@@ -155,10 +174,7 @@ class ApplicationsTable
                                 ->body("Matric number: {$enrolment->matric_number}")
                                 ->success()->send();
                         } catch (\Throwable $e) {
-                            Notification::make()
-                                ->title('Could not finalise')
-                                ->body($e->getMessage())
-                                ->danger()->send();
+                            Notification::make()->title('Could not finalise')->body($e->getMessage())->danger()->send();
                         }
                     }),
 
@@ -174,7 +190,13 @@ class ApplicationsTable
             ]);
     }
 
-    /** Build the identity radio options: ranked matches + a "create new person" choice. */
+    protected static function acceptanceFeePaid(Application $record): bool
+    {
+        $invoice = Invoice::where('application_id', $record->id)->first();
+
+        return $invoice ? $invoice->percentPaid() >= 100.0 : false;
+    }
+
     protected static function matchOptions(Application $record): array
     {
         $options = [];
@@ -188,7 +210,6 @@ class ApplicationsTable
         return $options;
     }
 
-    /** Default to the top-ranked match if any, else "new". */
     protected static function defaultChoice(Application $record): string
     {
         $matches = app(AdmissionService::class)->findReturningPersonMatches($record);
