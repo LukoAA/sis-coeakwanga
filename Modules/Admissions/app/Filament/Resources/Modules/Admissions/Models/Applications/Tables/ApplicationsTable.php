@@ -127,25 +127,7 @@ class ApplicationsTable
                             ->success()->send();
                     }),
 
-                // 3b. RECORD ACCEPTANCE PAYMENT — accepted & unpaid -> confirms the payment
-                Action::make('recordAcceptancePayment')
-                    ->label('Record acceptance payment')
-                    ->icon('heroicon-o-banknotes')
-                    ->color('warning')
-                    ->requiresConfirmation()
-                    ->modalDescription('Confirm the acceptance-fee payment for this applicant?')
-                    ->visible(fn (Application $record) => $record->status === Application::STATUS_ACCEPTED
-                        && ! static::acceptanceFeePaid($record))
-                    ->action(function (Application $record) {
-                        $invoice = Invoice::where('application_id', $record->id)->first()
-                            ?? app(InvoiceGenerator::class)->generateAcceptanceInvoice($record);
-
-                        $payments = app(PaymentService::class);
-                        $payments->confirmPayment($payments->recordPayment($invoice, (float) $invoice->balance()));
-
-                        Notification::make()->title('Acceptance payment recorded')->success()->send();
-                    }),
-
+               
                 // 4. FINALISE — accepted & fee paid -> enrolled (matcher + matric + enrolment)
                 Action::make('finalise')
                     ->label('Finalise admission')

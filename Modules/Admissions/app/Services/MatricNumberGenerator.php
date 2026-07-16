@@ -68,6 +68,18 @@ class MatricNumberGenerator
                 ]);
             }
 
+            // Guard against desync: never issue a serial at or below what already
+            // exists for this programme + session (enrolments created outside the
+            // generator, resets, rolled-back runs, etc.).
+            $highestUsed = \Modules\People\Models\Enrolment::query()
+                ->where('programme_id', $programmeId)
+                ->where('admission_session_id', $sessionId)
+                ->count();
+
+            if ($row->last_serial < $highestUsed) {
+                $row->last_serial = $highestUsed;
+            }
+
             $row->increment('last_serial');
 
             return $row->last_serial;
