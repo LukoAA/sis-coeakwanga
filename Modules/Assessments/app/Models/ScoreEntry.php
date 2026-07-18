@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Academics\Models\Course;
 use Modules\People\Models\Enrolment;
+use Modules\Identity\Models\AcademicSession;
 
 class ScoreEntry extends Model
 {
@@ -42,6 +43,11 @@ class ScoreEntry extends Model
     public function course(): BelongsTo
     {
         return $this->belongsTo(Course::class);
+    }
+
+    public function academicSession(): BelongsTo
+    {
+        return $this->belongsTo(AcademicSession::class);
     }
 
     public function scopePublished(Builder $query): Builder
