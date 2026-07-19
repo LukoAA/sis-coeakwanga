@@ -25,7 +25,7 @@ class LecturerPanelProvider extends PanelProvider
     {
         return $panel
             ->id('lecturer')->path('lecturer')->login()
-            
+            ->brandName('COE Akwanga — Lecturer')
 
             ->colors([
                 'primary' => Color::Amber,
@@ -39,7 +39,6 @@ class LecturerPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Lecturer/Widgets'), for: 'App\Filament\Lecturer\Widgets')
             ->widgets([
                 AccountWidget::class,
-                FilamentInfoWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

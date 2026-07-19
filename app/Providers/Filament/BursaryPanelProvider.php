@@ -27,6 +27,7 @@ class BursaryPanelProvider extends PanelProvider
             ->id('bursary')
             ->path('bursary')
             ->login()
+            ->brandName('COE Akwanga — Bursary')
             ->colors([
                 'primary' => Color::Amber,
             ])
@@ -39,7 +40,6 @@ class BursaryPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Bursary/Widgets'), for: 'App\Filament\Bursary\Widgets')
             ->widgets([
                 AccountWidget::class,
-                FilamentInfoWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
