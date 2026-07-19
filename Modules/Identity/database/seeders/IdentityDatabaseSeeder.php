@@ -39,7 +39,7 @@ class IdentityDatabaseSeeder extends Seeder
         Setting::put('institution_name', 'College of Education, Akwanga');
 
         // Core staff roles (Identity owns RBAC).
-        foreach (['registrar', 'bursar', 'lecturer', 'it_admin'] as $role) {
+        foreach (['registrar', 'bursar', 'lecturer', 'it_admin', 'student'] as $role) {
             \Spatie\Permission\Models\Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
         }
     }

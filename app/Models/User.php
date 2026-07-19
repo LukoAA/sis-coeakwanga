@@ -14,7 +14,7 @@ use Filament\Panel;
 use Spatie\Permission\Traits\HasRoles;
 use Spatie\Permission\Models\Role;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'password', 'person_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser
 {
@@ -40,6 +40,7 @@ class User extends Authenticatable implements FilamentUser
             'admin' => $this->hasAnyRole(['registrar', 'it_admin']),
             'bursary' => $this->hasAnyRole(['bursar', 'it_admin']),
             'lecturer' => $this->hasAnyRole(['lecturer', 'it_admin']),
+            'student' => $this->hasAnyRole(['student', 'it_admin']),
             default => false,
         };
     }
