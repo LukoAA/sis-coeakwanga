@@ -91,6 +91,22 @@ class ApplicationsTable
                         Notification::make()->title('Application screened')->success()->send();
                     }),
 
+                    Action::make('reject')
+                    ->label('Reject')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalDescription('Reject this application? This can be reversed by editing the record.')
+                    ->visible(fn (Application $record) => in_array($record->status, [
+                        Application::STATUS_PENDING,
+                        Application::STATUS_SCREENED,
+                        Application::STATUS_OFFERED,
+                    ]))
+                    ->action(function (Application $record) {
+                        $record->update(['status' => Application::STATUS_REJECTED]);
+                        Notification::make()->title('Application rejected')->danger()->send();
+                    }),
+
                 // 2. MAKE OFFER — screened -> offered
                 Action::make('makeOffer')
                     ->label('Make offer')
@@ -136,6 +152,11 @@ class ApplicationsTable
                     ->visible(fn (Application $record) => $record->status === Application::STATUS_ACCEPTED
                         && static::acceptanceFeePaid($record))
                     ->schema(fn (Application $record) => [
+                        Placeholder::make('summary')
+                            ->label('You are about to admit')
+                            ->content(fn () => trim("{$record->applicant_surname} {$record->applicant_first_name}")
+                                .' → '.($record->programme?->name ?? '—')
+                                .' ('.$record->entry_route.')'),
                         Radio::make('person_choice')
                             ->label('Applicant identity')
                             ->options(static::matchOptions($record))
