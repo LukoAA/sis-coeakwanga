@@ -4,14 +4,16 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\PermissionRegistrar;
-use Modules\Identity\Database\Seeders\IdentityDatabaseSeeder;
-use Modules\People\Database\Seeders\PeopleDatabaseSeeder;
+use Illuminate\Support\Facades\Hash;
 use Modules\Academics\Database\Seeders\AcademicsDatabaseSeeder;
 use Modules\Admissions\Database\Seeders\AdmissionsDatabaseSeeder;
-use Modules\Finance\Database\Seeders\FinanceDatabaseSeeder;
 use Modules\Assessments\Database\Seeders\AssessmentsDatabaseSeeder;
+use Modules\Finance\Database\Seeders\FinanceDatabaseSeeder;
+use Modules\Identity\Database\Seeders\IdentityDatabaseSeeder;
+use Modules\People\Database\Seeders\PeopleDatabaseSeeder;
+use Modules\Registration\Database\Seeders\RegistrationDatabaseSeeder;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class DatabaseSeeder extends Seeder
 {
@@ -19,38 +21,45 @@ class DatabaseSeeder extends Seeder
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        Role::firstOrCreate(['name' => 'registrar']);
-        Role::firstOrCreate(['name' => 'bursar']);
-        Role::firstOrCreate(['name' => 'lecturer']);
-        Role::firstOrCreate(['name' => 'it_admin']);
+        // 1) Roles (idempotent). 'student' included — the portal gate needs it.
+        foreach (['registrar', 'bursar', 'lecturer', 'it_admin', 'student'] as $role) {
+            Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
+        }
 
-        $superuser = User::factory()->create([
-            'name' => 'IT Admin', 'email' => 'it@example.com', 'password' => 'password',
-        ]);
-        $superuser->assignRole('it_admin');
-
-        $registrar = User::factory()->create([
-            'name' => 'Registrar', 'email' => 'registrar@example.com', 'password' => 'password',
-        ]);
-        $registrar->assignRole('registrar');
-
-        $bursar = User::factory()->create([
-            'name' => 'Bursar', 'email' => 'bursar@example.com', 'password' => 'password',
-        ]);
-        $bursar->assignRole('bursar');
-
-        $lecturer = User::factory()->create([
-            'name' => 'Lecturer', 'email' => 'lecturer@example.com', 'password' => 'password',
-        ]);
-        $lecturer->assignRole('lecturer');
-
+        // 2) Base data FIRST — Identity holds the current session that People,
+        //    Academics, etc. depend on. Order matters.
         $this->call([
             IdentityDatabaseSeeder::class,
             PeopleDatabaseSeeder::class,
             AcademicsDatabaseSeeder::class,
             AdmissionsDatabaseSeeder::class,
             FinanceDatabaseSeeder::class,
+            RegistrationDatabaseSeeder::class,
             AssessmentsDatabaseSeeder::class,
+        ]);
+
+        // 3) Staff logins — known passwords, correct roles. firstOrCreate so a
+        //    re-run never duplicates or errors.
+        $staff = [
+            ['IT Admin',  'it@example.com',        'it_admin'],
+            ['Registrar', 'registrar@example.com', 'registrar'],
+            ['Bursar',    'bursar@example.com',    'bursar'],
+            ['Lecturer',  'lecturer@example.com',  'lecturer'],
+        ];
+
+        foreach ($staff as [$name, $email, $role]) {
+            $user = User::firstOrCreate(
+                ['email' => $email],
+                ['name' => $name, 'password' => Hash::make('password')],
+            );
+            $user->assignRole($role);
+        }
+
+        // 4) Demo cohort, curriculum, and student logins — via real services.
+        $this->call([
+            DemoSeeder::class,
+            CurriculumSeeder::class,
+            StudentAccountSeeder::class,
         ]);
     }
 }
